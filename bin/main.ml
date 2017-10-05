@@ -44,8 +44,8 @@ let watch_files dir callback =
 let () =
   let cwd = Sys.getcwd () in
   let len = String.length cwd in
-  Lwt.async (fun () -> Lwt_io.printf "current directory is \"%s\"\n" cwd);
-  Lwt.async (fun () -> Lwt_io.printf "%s\n" (Sexp.to_string_hum (sexp_of_watch_config my_conf_)));
+  print_endline ("current directory is " ^ cwd);
+  print_endline (Sexp.to_string_hum (sexp_of_watch_config my_conf_));
   watch_files cwd (fun {path} ->
       with_return (fun {return} ->
           let p = String.drop_prefix path (len + 1) in
