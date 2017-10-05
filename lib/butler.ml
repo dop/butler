@@ -1,0 +1,2 @@
+let value =
+  "Hello, World!"

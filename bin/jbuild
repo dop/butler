@@ -1,0 +1,6 @@
+(jbuild_version 1)
+
+(executable
+ ((name main)
+  (libraries (lwt butler core osx-fsevents osx-fsevents.lwt osx-cf.lwt re re.glob))
+  (preprocess (pps (ppx_jane)))))
