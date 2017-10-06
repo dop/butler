@@ -41,6 +41,27 @@ let watch_files dir callback =
   let promise, resolver = Lwt.wait () in
   Lwt_main.run promise
 
+let find_action_for path =
+  let rec loop = function
+    | [] ->
+      None
+    | (rx, action) :: rest ->
+      if Re.execp rx path then
+        Some action
+      else
+        loop rest
+  in loop my_conf
+
+let invoke_action = function
+  | Ignore ->
+    Lwt.return_unit
+  | Run cmd ->
+    let cmd = ("", cmd) in
+    Lwt.(
+      Lwt_io.printf "running %s" (pp_command cmd)
+      >>= fun _ -> Lwt_process.exec cmd >|= ignore
+    )
+
 let () =
   let cwd = Sys.getcwd () in
   let len = String.length cwd in
@@ -49,24 +70,10 @@ let () =
   watch_files cwd (fun {path} ->
       with_return (fun {return} ->
           let p = String.drop_prefix path (len + 1) in
-          let rec loop = function
-            | [] ->
-              Lwt.return_unit
-            | (rx, action) :: rest ->
-              if Re.execp rx p then
-                match action with
-                | Ignore ->
-                  Lwt.return_unit
-                | Run cmd ->
-                  let cmd = ("", cmd) in
-                  Lwt.(
-                    Lwt_io.printf "%s changed, running %s\n" p (pp_command cmd)
-                    >>= fun _ -> Lwt_process.exec cmd
-                    >|= ignore
-                  )
-              else
-                loop rest
-          in
-          return (loop my_conf)
+          let _ = Lwt_io.printf "%s changed" p in
+          Option.value ~default:Lwt.return_unit
+            (Option.map
+               ~f:invoke_action
+               (find_action_for p))
         )
     )
