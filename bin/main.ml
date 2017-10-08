@@ -1,4 +1,4 @@
 open Core
 
 let () =
-  Butler.run "." (Butler.read_config "butler")
+  Butler.run ~config_file:"butler" "."

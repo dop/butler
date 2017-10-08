@@ -1,8 +1,14 @@
 open Core
 
+type command =
+  string array
+[@@deriving sexp]
+
 type watch_action =
   | Ignore
-  | Run of string array
+  | Run of command
+  | Timeout of (float * command)
+  | Seq of watch_action list
 [@@deriving sexp]
 
 type watch_config =
@@ -32,22 +38,50 @@ let watch_files dir callback =
   let promise, resolver = Lwt.wait () in
   Lwt_main.run promise
 
-let invoke_action = function
+let to_lwt_cmd cmd =
+  ("", cmd)
+
+let rec invoke_action action =
+  let run_command ?timeout cmd =
+    let cmd = to_lwt_cmd cmd in
+    Lwt.(
+      Lwt_io.printf "running %s\n" (pp_command cmd)
+      >>= (fun _ ->
+          match timeout with
+          | Some ms -> Lwt_process.exec ~timeout:ms cmd
+          | None -> Lwt_process.exec cmd
+        )
+      >|= ignore
+    )
+  in
+  match action with
   | Ignore ->
     Lwt.return_unit
   | Run cmd ->
-    let cmd = ("", cmd) in
-    Lwt.(
-      Lwt_io.printf "running %s\n" (pp_command cmd)
-      >>= fun _ -> Lwt_process.exec cmd >|= ignore
-    )
+    run_command cmd
+  | Timeout (ms, cmd) ->
+    run_command ~timeout:ms cmd
+  | Seq actions ->
+    Lwt_list.fold_left_s (fun () -> invoke_action) () actions
 
-let read_config file =
-  In_channel.read_all file |>
-  Sexp.of_string |>
-  watch_config_of_sexp
+let read_config file : watch_config =
+  let config =
+    try
+      In_channel.read_all file |>
+      Sexp.of_string |>
+      watch_config_of_sexp
+    with
+      Sexplib.Conv.Of_sexp_error (e, sexp) ->
+      print_endline "failed to parse configuration file. continuing with empty config";
+      print_endline (Exn.to_string e);
+      []
+  in
+  print_endline "current configuration:";
+  print_endline (Sexp.to_string_hum (sexp_of_watch_config config));
+  config
 
-let run dir config =
+let run dir ~config_file =
+  let config = ref (read_config config_file) in
   let find_action path =
     let rec loop = function
       | [] ->
@@ -57,20 +91,22 @@ let run dir config =
           Some action
         else
           loop rest
-    in loop (to_watch_config config)
+    in loop (to_watch_config !config)
   in
   let () = Sys.chdir dir in
   let cwd = Sys.getcwd () in
   let len = String.length cwd in
   print_endline ("current directory is " ^ cwd);
-  print_endline (Sexp.to_string_hum (sexp_of_watch_config config));
-  watch_files cwd (fun {path} ->
-      with_return (fun {return} ->
-          let p = String.drop_prefix path (len + 1) in
-          let _ = Lwt_io.printf "%s changed\n" p in
-          Option.value ~default:Lwt.return_unit
-            (Option.map
-               ~f:invoke_action
-               (find_action p))
-        )
-    )
+  ignore (watch_files cwd (fun {path} ->
+      let p = String.drop_prefix path (len + 1) in
+      print_endline (p ^ " changed");
+      if p = config_file then (
+        print_endline "configuration changed";
+        config := read_config config_file;
+        Lwt.return_unit
+      ) else
+        Option.value ~default:Lwt.return_unit
+          (Option.map
+             ~f:invoke_action
+             (find_action p))
+    ))
