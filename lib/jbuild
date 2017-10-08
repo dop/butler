@@ -2,7 +2,7 @@
 
 (library
  ((name butler)
-  (libraries (lwt core osx-fsevents osx-fsevents.lwt osx-cf.lwt re re.glob))
+  (libraries (lwt cohttp-lwt-unix core osx-fsevents osx-fsevents.lwt osx-cf.lwt re re.glob))
   (preprocess (pps (ppx_jane)))
   (wrapped false)
   (public_name butler)))
