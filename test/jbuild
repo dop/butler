@@ -2,5 +2,5 @@
 
 (executable
  ((name tests)
-  (libraries (butler core alcotest))
+  (libraries (butler fileutils core alcotest))
   (preprocess (pps (ppx_jane)))))
