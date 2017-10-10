@@ -49,7 +49,7 @@ let watch_files dir callback =
       if not (Fsevents.start event_stream) then
         prerr_endline "failed to start FSEvents stream"
     ));
-  let promise, resolver = Lwt.wait () in
+  let promise, _ = Lwt.wait () in
   Lwt_main.run promise
 
 let to_lwt_cmd cmd =
@@ -93,7 +93,7 @@ let read_config file : watch_config =
       Sexp.of_string |>
       watch_config_of_sexp
     with
-      Sexplib.Conv.Of_sexp_error (e, sexp) ->
+      Sexplib.Conv.Of_sexp_error (e, _) ->
       print_endline "failed to parse configuration file. continuing with empty config";
       print_endline (Exn.to_string e);
       []
@@ -127,7 +127,7 @@ let run dir ~config_file =
   let cwd = Sys.getcwd () in
   let len = String.length cwd in
   print_endline ("current directory is " ^ cwd);
-  ignore (watch_files cwd (fun {path} ->
+  ignore (watch_files cwd (fun {path; _} ->
       let p = String.drop_prefix path (len + 1) in
       (* print_endline (p ^ " changed"); *)
       if p = config_file then (

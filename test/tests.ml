@@ -3,7 +3,7 @@ open Cohttp_lwt_unix
 
 let make_file_server dir =
   print_endline ("serving " ^ dir);
-  fun req body ->
+  fun _ _ ->
     let files =
       let prefix = FilePath.concat dir "public" in
       let prefix_len = String.length prefix in

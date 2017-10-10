@@ -22,7 +22,7 @@ let http_get uri =
   let open Lwt in
   Lwt_main.run begin
     Client.get uri
-    >>= fun (resp, body) -> Cohttp_lwt.Body.to_string body
+    >>= fun (_, body) -> Cohttp_lwt.Body.to_string body
   end
 
 let char_range a z =
@@ -54,7 +54,7 @@ let make_file_tree spec =
     | Directory (name, files) ->
       let parent = workdir / name in
       mkdir parent;
-      List.iter files (tmp_file_tree_1 parent)
+      List.iter ~f:(tmp_file_tree_1 parent) files
     | File (name, _) ->
       touch (workdir / name)
   in
