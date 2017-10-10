@@ -1,6 +1,18 @@
 open Core
 open Cohttp_lwt_unix
 
+let make_file_server dir =
+  print_endline ("serving " ^ dir);
+  fun req body ->
+    let files =
+      let prefix = FilePath.concat dir "public" in
+      let prefix_len = String.length prefix in
+      FileUtil.ls prefix
+      |> List.map ~f:(fun name -> String.drop_prefix name prefix_len)
+    in
+    let body = Sexp.to_string (sexp_of_list sexp_of_string files) in
+    Server.respond_string ~status:`OK ~body ()
+
 let serve_index () =
   let spec =
     let open Test_utils in
@@ -14,16 +26,7 @@ let serve_index () =
   in
   let workdir = Test_utils.make_file_tree spec in
   Lwt_main.run (
-    Test_utils.with_server 8080
-      (fun _ _ ->
-         let files =
-           let prefix = FilePath.concat workdir "public" in
-           let prefix_len = String.length prefix in
-           FileUtil.ls prefix
-           |> List.map ~f:(fun name -> String.drop_prefix name prefix_len)
-         in
-         let body = Sexp.to_string (sexp_of_list sexp_of_string files) in
-         Server.respond_string ~status:`OK ~body ())
+    Test_utils.with_server 8080 (make_file_server workdir)
       (fun uri ->
          Lwt.return (
            Alcotest.(check (list string)) "correct list of files"

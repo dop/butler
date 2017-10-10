@@ -1,5 +1,4 @@
-(
- ((or ((glob "_build")
+(((or ((glob "_build")
        (glob "*#")
        (glob "*.swp")
        (glob "*~")))
@@ -7,12 +6,9 @@
 
  ((or ((glob "lib/*.ml{,i}")
        (glob "bin/*.ml{,i}")))
-  (run ("jbuilder" "build" "--debug-backtraces" "bin/main.bc")))
+  (run (make)))
 
  ((or ((glob "lib/*.ml{,i}")
        (glob "bin/*.ml{,i}")
        (glob "test/*.ml{,i}")))
-  (seq
-   ((run ("jbuilder" "build" "--debug-backtraces" "test/tests.bc"))
-    (timeout (5 ("./_build/default/test/tests.bc"))))))
- )
+  (run (make check))))
