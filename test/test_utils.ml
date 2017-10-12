@@ -16,7 +16,7 @@ let with_server port spec test =
         | Lwt.Canceled -> Lwt.return_unit
         | x -> Lwt.wakeup_exn server_failed_wake x; Lwt.fail x)
   in
-  Lwt.(pick [ test uri; server_failed ] >|= fun res -> cancel server; res)
+  Lwt.(pick [ return (test uri); server_failed ] >|= fun res -> cancel server; res)
 
 let http_get uri =
   let open Lwt in
@@ -55,8 +55,8 @@ let make_file_tree spec =
       let parent = workdir / name in
       mkdir parent;
       List.iter ~f:(tmp_file_tree_1 parent) files
-    | File (name, _) ->
-      touch (workdir / name)
+    | File (name, contents) ->
+      Out_channel.write_all ~data:contents (workdir / name)
   in
   let tmpdir = FilePath.make_filename [Sys.getenv_exn "TMPDIR"] in
   let workdir = tmpdir / ("butler-" ^ random_string ()) in
