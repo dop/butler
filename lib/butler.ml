@@ -1,4 +1,5 @@
 open Core
+open Cohttp_lwt_unix
 
 type command =
   string array
@@ -8,7 +9,6 @@ type watch_action =
   | Ignore
   | Run of command
   | Timeout of (float * command)
-  | Seq of watch_action list
 [@@deriving sexp]
 
 type 'a watch_matcher =
@@ -55,7 +55,7 @@ let watch_files dir callback =
 let to_lwt_cmd cmd =
   ("", cmd)
 
-let rec invoke_action file action =
+let rec invoke_action file actions =
   let run_command ?timeout cmd =
     let cmd = to_lwt_cmd cmd in
     Lwt.(
@@ -67,21 +67,22 @@ let rec invoke_action file action =
         )
     )
   in
+  let ifOk action next =
+    Lwt.(action >>= function
+      | UnixLabels.WEXITED 0 -> next
+      | status -> Lwt.return status
+      )
+  in
   let ok = UnixLabels.WEXITED 0 in
-  match action with
-  | Ignore ->
+  match actions with
+  | [] ->
     Lwt.return ok
-  | Run cmd ->
-    run_command cmd
-  | Timeout (ms, cmd) ->
-    run_command ~timeout:ms cmd
-  | Seq actions ->
-    Lwt_list.fold_left_s (function
-        | UnixLabels.WEXITED 0 ->
-          invoke_action file
-        | status ->
-          (fun _ -> Lwt.return status)
-      ) ok actions
+  | Ignore :: _ ->
+    Lwt.return ok
+  | Run cmd :: actions ->
+    ifOk (run_command cmd) (invoke_action file actions)
+  | Timeout (ms, cmd) :: actions ->
+    ifOk (run_command ~timeout:ms cmd) (invoke_action file actions)
 
 let invoke file action =
   Lwt.(invoke_action file action >|= ignore)
@@ -112,16 +113,16 @@ let rec matches path = function
 
 let run dir ~config_file =
   let config = ref (read_config config_file) in
-  let find_action path =
-    let rec loop = function
+  let find_actions path =
+    let rec loop actions = function
       | [] ->
-        None
+        List.rev actions
       | (matcher, action) :: rest ->
         if matches path matcher then
-          Some action
+          loop (action :: actions) rest
         else
-          loop rest
-    in loop (to_watch_config !config)
+          loop actions rest
+    in loop [] (to_watch_config !config)
   in
   let () = Sys.chdir dir in
   let cwd = Sys.getcwd () in
@@ -135,8 +136,33 @@ let run dir ~config_file =
         config := read_config config_file;
         Lwt.return_unit
       ) else
-        Option.value ~default:Lwt.return_unit
-          (Option.map
-             ~f:(invoke p)
-             (find_action p))
+        invoke p (find_actions p)
     ))
+
+let make_file_server dir =
+  let ok body =
+    Server.respond_string ~status:`OK ~body ()
+  in
+  let serve_file fname =
+    Server.respond_file ~fname ()
+  in
+  let not_found () =
+    Server.respond_string ~status:`Not_found ~body:"Not found" ()
+  in
+  print_endline ("serving " ^ dir);
+  let root = FilePath.concat dir "public" in
+  let len = String.length root in
+  let drop_root filepath =
+    String.drop_prefix filepath len
+  in
+  fun req _ ->
+    let uri_path = String.drop_prefix (Uri.path (Request.uri req)) 1 in
+    let files = FileUtil.ls root in
+    if String.length uri_path > 0 then
+      match List.find ~f:(String.is_suffix ~suffix:uri_path) files with
+      | Some filepath ->
+        serve_file filepath
+      | None ->
+        not_found ()
+    else
+      ok (Sexp.to_string (sexp_of_list sexp_of_string (List.map ~f:drop_root files)))
