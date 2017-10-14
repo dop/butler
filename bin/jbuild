@@ -2,5 +2,5 @@
 
 (executable
  ((name main)
-  (libraries (butler core))
+  (libraries (butler core cmdliner))
   (preprocess (pps (ppx_jane)))))
