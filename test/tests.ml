@@ -1,6 +1,8 @@
 open Core
 (* open Cohttp_lwt_unix *)
 
+let ( / ) = FilePath.concat
+
 let setup ?additional_files () =
   let open Test_utils in
   let files =
@@ -16,7 +18,7 @@ let setup ?additional_files () =
     ))
 
 let serve_index () =
-  let workdir = setup () in
+  let workdir = setup () / "public" in
   Lwt_main.run (
     Test_utils.with_server 8080 (Butler.make_file_server workdir)
       (fun uri ->
@@ -28,8 +30,10 @@ let serve_index () =
       ))
 
 let serve_file () =
+  let open Test_utils in
   let contents = "<!doctype><html></html>" in
-  let workdir = setup ~additional_files:[File ("index.html", contents)] () in
+  let files = [File ("index.html", contents)] in
+  let workdir = setup ~additional_files:files () / "public" in
   Lwt_main.run (
     Test_utils.with_server 8080 (Butler.make_file_server workdir)
       (fun uri ->

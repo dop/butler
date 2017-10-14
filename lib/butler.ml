@@ -111,7 +111,38 @@ let rec matches path = function
   | Or xs ->
     List.exists ~f:(matches path) xs
 
-let run dir ~config_file =
+let make_file_server root =
+  let ok body =
+    Server.respond_string ~status:`OK ~body ()
+  in
+  let serve_file fname =
+    Server.respond_file ~fname ()
+  in
+  let not_found () =
+    Server.respond_string ~status:`Not_found ~body:"Not found" ()
+  in
+  print_endline ("serving " ^ root);
+  let len = String.length root in
+  let drop_root filepath =
+    String.drop_prefix filepath len
+  in
+  fun req _ ->
+    let uri_path = String.drop_prefix (Uri.path (Request.uri req)) 1 in
+    let files = FileUtil.ls root in
+    if String.length uri_path > 0 then
+      match List.find ~f:(String.is_suffix ~suffix:uri_path) files with
+      | Some filepath ->
+        serve_file filepath
+      | None ->
+        not_found ()
+    else
+      ok (Sexp.to_string (sexp_of_list sexp_of_string (List.map ~f:drop_root files)))
+
+let run_server port handler =
+  let server = Server.make ~callback:(fun _ -> handler) () in
+  Server.create ~mode:(`TCP (`Port port)) server
+
+let run ?(serve=false) ~config_file dir =
   let config = ref (read_config config_file) in
   let find_actions path =
     let rec loop actions = function
@@ -128,6 +159,11 @@ let run dir ~config_file =
   let cwd = Sys.getcwd () in
   let len = String.length cwd in
   print_endline ("current directory is " ^ cwd);
+  if serve then
+    Lwt.async (fun () ->
+        print_endline ("serving " ^ cwd ^ " on port 8080");
+        run_server 8080 (make_file_server cwd)
+      );
   ignore (watch_files cwd (fun {path; _} ->
       let p = String.drop_prefix path (len + 1) in
       (* print_endline (p ^ " changed"); *)
@@ -138,31 +174,3 @@ let run dir ~config_file =
       ) else
         invoke p (find_actions p)
     ))
-
-let make_file_server dir =
-  let ok body =
-    Server.respond_string ~status:`OK ~body ()
-  in
-  let serve_file fname =
-    Server.respond_file ~fname ()
-  in
-  let not_found () =
-    Server.respond_string ~status:`Not_found ~body:"Not found" ()
-  in
-  print_endline ("serving " ^ dir);
-  let root = FilePath.concat dir "public" in
-  let len = String.length root in
-  let drop_root filepath =
-    String.drop_prefix filepath len
-  in
-  fun req _ ->
-    let uri_path = String.drop_prefix (Uri.path (Request.uri req)) 1 in
-    let files = FileUtil.ls root in
-    if String.length uri_path > 0 then
-      match List.find ~f:(String.is_suffix ~suffix:uri_path) files with
-      | Some filepath ->
-        serve_file filepath
-      | None ->
-        not_found ()
-    else
-      ok (Sexp.to_string (sexp_of_list sexp_of_string (List.map ~f:drop_root files)))
