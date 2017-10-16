@@ -39,18 +39,7 @@ let pp_command (_, args) =
   Printf.sprintf "%s" (String.concat_array ~sep:" " args)
 
 let watch_files dir callback =
-  let flags = Fsevents.CreateFlags.detailed_interactive in
-  let watcher = Fsevents_lwt.create 0. flags [dir] in
-  let stream = Fsevents_lwt.stream watcher in
-  let event_stream = Fsevents_lwt.event_stream watcher in
-  Lwt.async (fun () -> Lwt_stream.iter_s callback stream);
-  Lwt.async (fun () -> Cf_lwt.RunLoop.run_thread (fun runloop ->
-      Fsevents.schedule_with_run_loop event_stream runloop Cf.RunLoop.Mode.Default;
-      if not (Fsevents.start event_stream) then
-        prerr_endline "failed to start FSEvents stream"
-    ));
-  let promise, _ = Lwt.wait () in
-  Lwt_main.run promise
+  ignore (Butler_utils.internal_watch_files dir callback)
 
 let to_lwt_cmd cmd =
   ("", cmd)
@@ -164,7 +153,7 @@ let run ?(serve=false) ~config_file dir =
         print_endline ("serving " ^ cwd ^ " on port 8080");
         run_server 8080 (make_file_server cwd)
       );
-  ignore (watch_files cwd (fun {path; _} ->
+  ignore (watch_files cwd (fun _ path ->
       let p = String.drop_prefix path (len + 1) in
       (* print_endline (p ^ " changed"); *)
       if p = config_file then (
