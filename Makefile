@@ -8,7 +8,7 @@ all:
 
 check:
 	$(JB) test/tests.bc
-	_build/default/test/tests.bc --color=always -v
+	_build/default/test/tests.bc --color=always
 
 clean:
 	jbuilder clean
