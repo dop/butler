@@ -92,14 +92,6 @@ let read_config file : watch_config =
   print_endline (Sexp.to_string_hum (sexp_of_watch_config config));
   config
 
-let rec matches path = function
-  | Glob rx ->
-    Re.execp rx path
-  | And xs ->
-    List.for_all ~f:(matches path) xs
-  | Or xs ->
-    List.exists ~f:(matches path) xs
-
 let make_file_server root =
   let ok body =
     Server.respond_string ~status:`OK ~body ()
@@ -131,19 +123,20 @@ let run_server port handler =
   let server = Server.make ~callback:(fun _ -> handler) () in
   Server.create ~mode:(`TCP (`Port port)) server
 
-let run ?(serve=false) ~config_file dir =
-  let config = ref (read_config config_file) in
-  let find_actions path =
-    let rec loop actions = function
-      | [] ->
-        List.rev actions
-      | (matcher, action) :: rest ->
-        if matches path matcher then
-          loop (action :: actions) rest
-        else
-          loop actions rest
-    in loop [] (to_watch_config !config)
+let find_actions config path =
+  let rec matches path = function
+  | Glob rx ->
+    Re.execp rx path
+  | And xs ->
+    List.for_all ~f:(matches path) xs
+  | Or xs ->
+    List.exists ~f:(matches path) xs
   in
+  List.filter ~f:(fun (m, _) -> matches path m) config
+  |> List.map ~f:snd
+
+let run ?(serve=false) ~config_file dir =
+  let config = ref (to_watch_config (read_config config_file)) in
   let () = Sys.chdir dir in
   let cwd = Sys.getcwd () in
   let len = String.length cwd in
@@ -155,11 +148,10 @@ let run ?(serve=false) ~config_file dir =
       );
   ignore (watch_files cwd (fun _ path ->
       let p = String.drop_prefix path (len + 1) in
-      (* print_endline (p ^ " changed"); *)
       if p = config_file then (
         print_endline "configuration changed";
-        config := read_config config_file;
+        config := to_watch_config (read_config config_file);
         Lwt.return_unit
       ) else
-        invoke p (find_actions p)
+        invoke p (find_actions !config p)
     ))
