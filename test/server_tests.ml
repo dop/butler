@@ -20,7 +20,7 @@ let setup ?additional_files () =
 let serve_index () =
   let workdir = setup () / "public" in
   Lwt_main.run (
-    Test_utils.with_server 8080 (Butler.make_file_server workdir)
+    Test_utils.with_server 8080 (Butler_server.make_file_server workdir)
       (fun uri ->
          Alcotest.(check (list string)) "correct list of files"
            ["/index.html"; "/main.js"; "/style.css"]
@@ -35,7 +35,7 @@ let serve_file () =
   let files = [File ("index.html", contents)] in
   let workdir = setup ~additional_files:files () / "public" in
   Lwt_main.run (
-    Test_utils.with_server 8080 (Butler.make_file_server workdir)
+    Test_utils.with_server 8080 (Butler_server.make_file_server workdir)
       (fun uri ->
          Alcotest.(check string) "correct file contents"
            contents

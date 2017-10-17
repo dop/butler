@@ -4,9 +4,9 @@
        (glob "*~")))
   ignore)
 
- ;; ((or ((glob "{lib,bin}/*.ml{,i}")
- ;;       (glob "{lib,bin}/jbuild")))
- ;;  (run (make)))
+ ((or ((glob "{lib,bin}/*.ml{,i}")
+       (glob "{lib,bin}/jbuild")))
+  (run (make)))
 
  ((or ((glob "{lib,bin}/*.ml{,i}")
        (glob "{lib,bin}/jbuild")

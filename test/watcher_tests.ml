@@ -12,7 +12,7 @@ let test_file_change () =
   Lwt.(async (fun () -> Lwt_unix.sleep 0.1 >|= fun () -> FileUtil.touch (workdir / "file")));
   let changed = Lwt_main.run (Lwt.(
         pick [ Lwt_unix.sleep 1.0 >|= const false
-             ; Butler_utils.internal_watch_files workdir (fun waker _ ->
+             ; Butler_utils.watch_files workdir (fun waker _ ->
                    Lwt.wakeup waker true;
                    Lwt.return_unit
                  )
