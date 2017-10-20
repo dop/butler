@@ -17,16 +17,35 @@ let setup ?additional_files () =
       files @ (Option.value ~default:[] additional_files)
     ))
 
+let get_hrefs str =
+  let open Soup in
+  (parse str) $$ "a[href]"
+  |> to_list
+  |> List.fold ~init:[] ~f:(fun hrefs node ->
+      match attribute "href" node with
+      | Some href -> href :: hrefs
+      | None -> hrefs
+    )
+  |> List.rev
+
 let serve_index () =
   let workdir = setup () / "public" in
   Lwt_main.run (
     Test_utils.with_server 8080 (Butler_server.make_file_server workdir)
       (fun uri ->
          Alcotest.(check (list string)) "correct list of files"
-           ["/index.html"; "/main.js"; "/style.css"]
-           (Test_utils.http_get uri
-            |> Sexp.of_string
-            |> list_of_sexp string_of_sexp)
+           ["index.html"; "main.js"; "style.css"]
+           (Test_utils.http_get uri |> get_hrefs)
+      ))
+
+let skip_dot_files () =
+  let workdir = setup ~additional_files:[File (".secret", "")] () / "public" in
+  Lwt_main.run (
+    Test_utils.with_server 8080 (Butler_server.make_file_server workdir)
+      (fun uri ->
+         Alcotest.(check (list string)) "correct list of files"
+           ["index.html"; "main.js"; "style.css"]
+           (Test_utils.http_get uri |> get_hrefs)
       ))
 
 let serve_file () =
@@ -44,5 +63,6 @@ let serve_file () =
 
 let tests =
   [ "index", `Slow, serve_index
+  ; "skip dot files", `Slow, skip_dot_files
   ; "file", `Slow, serve_file
   ]
