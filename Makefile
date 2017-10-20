@@ -1,8 +1,13 @@
 JB=jbuilder build --dev --debug-backtraces
 
-.PHONY: clean check all
+all: main.exe
 
-all:
+install: main.exe
+	cp main.exe ~/bin/butler
+
+.PHONY: clean check main.exe
+
+main.exe:
 	$(JB) bin/main.exe
 	cp _build/default/bin/main.exe .
 
