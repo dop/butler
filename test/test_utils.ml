@@ -28,9 +28,9 @@ let http_get uri =
 let char_range a z =
   let l = Char.to_int a and r = Char.to_int z in
   if l <= r then
-    let result = String.create (r - l + 1) in
+    let result = Bytes.create (r - l + 1) in
     List.range ~stop:`inclusive l r
-    |> List.iteri ~f:(fun i n -> result.[i] <- Char.of_int_exn n);
+    |> List.iteri ~f:(fun i n -> Bytes.set result i (Char.of_int_exn n));
     result
   else
     ""
@@ -42,7 +42,7 @@ let random_string () =
   let source_len = String.length source in
   let output = String.make 20 '_' in
   for i = 0 to 19 do
-    output.[i] <- source.[Random.int source_len]
+    Bytes.set output i source.[Random.int source_len]
   done;
   output
 
