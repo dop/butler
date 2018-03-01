@@ -17,9 +17,6 @@ let html_to_string doc =
   Format.asprintf "%a" (Html.pp ()) doc
 
 let make_file_server root =
-  (* let ok body = *)
-  (*   Server.respond_string ~status:`OK ~body () *)
-  (* in *)
   let html body =
     let headers = Cohttp.Header.of_list [
         "Content-Type", "text/html; charset=utf-8"
@@ -43,7 +40,10 @@ let make_file_server root =
     if String.length uri_path > 0 then (
       match List.find ~f:(String.is_suffix ~suffix:uri_path) files with
       | Some filepath ->
-        serve_file filepath
+        if String.is_suffix ~suffix:".html" filepath then
+          html (Butler_livereload.html_inject_script (In_channel.read_all filepath))
+        else
+          serve_file filepath
       | None ->
         not_found ()
     ) else (

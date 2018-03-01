@@ -61,8 +61,33 @@ let serve_file () =
            (Test_utils.http_get (Uri.with_path uri "index.html"))
       ))
 
+let serve_html () =
+  let open Test_utils in
+  let contents = "<!doctype><html><body></body></html>" in
+  let modified_contents = "<!doctype><html><body><script src=\"/livereload.js\"></script></body></html>" in
+  let files = [File ("index.html", contents)] in
+  let workdir = setup ~additional_files:files () / "public" in
+  Lwt_main.run (
+    Test_utils.with_server 8080 (Butler_server.make_file_server workdir)
+      (fun uri ->
+         Alcotest.(check string) "correct file contents"
+           modified_contents
+           (Test_utils.http_get (Uri.with_path uri "index.html"))
+      ))
+
+let script_tag =
+  "<script src=\"/livereload.js\"></script>"
+
+let modify_html () =
+  Alcotest.(check string) "added livereload script to head"
+    ("<body>" ^ script_tag ^ "</body>")
+    (Butler_livereload.html_inject_script "<body></body>")
+
 let tests =
   [ "index", `Slow, serve_index
   ; "skip dot files", `Slow, skip_dot_files
   ; "file", `Slow, serve_file
+  ; "serving html", `Slow, serve_html
+
+  ; "modifying html", `Quick, modify_html
   ]
