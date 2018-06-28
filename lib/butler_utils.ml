@@ -49,7 +49,7 @@ let cmd_to_lwt = function
     `Run (fun () -> Lwt_process.exec ~timeout (to_lwt_cmd cmd))
 
 let to_glob matcher =
-  let to_rx str = Re.compile (Re_glob.glob ~expand_braces:true str) in
+  let to_rx str = Re.compile (Re.Glob.glob ~expand_braces:true str) in
   let rec convert = function
     | Glob str ->
       Glob (to_rx str)
@@ -61,7 +61,7 @@ let to_glob matcher =
   convert matcher
 
 let to_watch_config config =
-  let to_rx str = Re.compile (Re_glob.glob ~expand_braces:true str) in
+  let to_rx str = Re.compile (Re.Glob.glob ~expand_braces:true str) in
   let rec convert = function
     | Glob str ->
       Glob (to_rx str)
