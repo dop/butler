@@ -2,6 +2,22 @@ open Core
 open Cohttp_lwt_unix
 open Tyxml
 
+let ws_server port handler =
+  let open Websocket_lwt in
+  let mode = `TCP (`Port port) in
+  establish_server ~mode (fun client ->
+      let recv () = Connected_client.recv client in
+      let send f = Connected_client.send client f in
+      handler (recv, send)
+    )
+
+let ws_client address port handler =
+  let open Websocket_lwt in
+  let ip = Ipaddr.of_string_exn address in
+  let client = `TCP (`IP ip, `Port port) in
+  let uri = Uri.empty in
+  Lwt.(with_connection client uri >>= handler)
+
 let html_listing files =
   Html.(
     html

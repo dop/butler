@@ -6,17 +6,28 @@ type file_tree =
   | File of string * string
 
 let with_server port spec test =
-  let server = Server.make ~callback:(fun _ req body -> spec req body) () in
   let uri = Uri.of_string ("http://0.0.0.0:" ^ (string_of_int port)) in
   let server_failed, server_failed_wake = Lwt.task () in
-  let server =
+  let server_lwt =
     Lwt.catch
-      (fun () -> Server.create ~mode:(`TCP (`Port port)) server)
+      (fun () -> Butler_server.run port spec)
       (function
         | Lwt.Canceled -> Lwt.return_unit
         | x -> Lwt.wakeup_exn server_failed_wake x; Lwt.fail x)
   in
-  Lwt.(pick [ return (test uri); server_failed ] >|= fun res -> cancel server; res)
+  Lwt.(pick [return (test uri); server_failed] >|= fun res -> cancel server_lwt; res)
+
+let with_ws_server port spec test =
+  let server_failed, server_failed_wake = Lwt.task () in
+  let server_lwt =
+    Lwt.catch
+      (fun () -> Butler_server.ws_server port spec)
+      (function
+        | Lwt.Canceled -> Lwt.return_unit
+        | x -> Lwt.wakeup_exn server_failed_wake x; Lwt.fail x)
+  in
+  let test_lwt = Butler_server.ws_client "127.0.0.1" port test in
+  Lwt.(pick [test_lwt; server_failed] >|= fun res -> cancel server_lwt; res)
 
 let http_get uri =
   let open Lwt in

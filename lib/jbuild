@@ -2,7 +2,21 @@
 
 (library
  ((name butler)
-  (libraries (lwt cohttp-lwt-unix fileutils core osx-fsevents osx-fsevents.lwt osx-cf.lwt re re.glob tyxml markup lambdasoup))
+  (libraries
+     (lwt
+      cohttp-lwt-unix
+      fileutils
+      core
+      osx-fsevents
+      osx-fsevents.lwt
+      osx-cf.lwt
+      re
+      re.glob
+      tyxml
+      markup
+      lambdasoup
+      websocket
+      websocket-lwt))
   (preprocess (pps (ppx_jane)))
   (wrapped false)
   (public_name butler)))

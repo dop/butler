@@ -83,11 +83,23 @@ let modify_html () =
     ("<body>" ^ script_tag ^ "</body>")
     (Butler_livereload.html_inject_script "<body></body>")
 
+let serve_websocket () =
+  let open Websocket in
+  Lwt_main.run Lwt.(
+      let server (_, write) =
+        write (Frame.create ~content:"hi" ()) in
+      Test_utils.with_ws_server 9001 server (fun (read, _) ->
+          read () >|= (fun {content; _} ->
+              Alcotest.(check string) "correct message" "hi" content
+            )
+        )
+    )
+
 let tests =
   [ "index", `Slow, serve_index
   ; "skip dot files", `Slow, skip_dot_files
   ; "file", `Slow, serve_file
   ; "serving html", `Slow, serve_html
-
   ; "modifying html", `Quick, modify_html
+  ; "websocket", `Slow, serve_websocket
   ]
